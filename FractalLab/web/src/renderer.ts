@@ -1,8 +1,11 @@
 import shaderSource from './shaders.wgsl?raw';
 import type { FractalState } from './main';
 
-// Size of FractalUniforms struct in bytes (14 × 4-byte fields)
-const UNIFORM_SIZE = 56;
+// Size of FractalUniforms struct in bytes.
+// WGSL requires uniform structs to have SizeOf = roundUp(AlignOf, member_sum).
+// AlignOf a struct in <uniform> is max(16, max_member_align) = 16.
+// roundUp(16, 14 × 4 = 56) = 64. Safari/WebKit strictly enforces this.
+const UNIFORM_SIZE = 64;
 
 export class FractalRenderer {
   readonly device: GPUDevice;
