@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a0066"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="38%" cy="48%" r="45%">
+      <stop offset="0%" stop-color="#4466ff" stop-opacity="0.8"/>
+      <stop offset="40%" stop-color="#ff6600" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
+
+  <!-- Glow blob representing the Mandelbrot shape -->
+  <ellipse cx="196" cy="256" rx="130" ry="108" fill="url(#glow)" opacity="0.9"/>
+  <ellipse cx="310" cy="246" rx="68"  ry="62"  fill="#ff7700" opacity="0.25"/>
+
+  <!-- Simplified Mandelbrot silhouette (main cardioid + period-2 bulb) -->
+  <path
+    d="M 310 256
+       C 310 216 280 186 240 186
+       C 210 186 186 202 178 228
+       C 164 222 150 228 144 244
+       C 136 264 148 284 166 290
+       C 174 316 200 332 230 328
+       C 258 324 282 308 294 286
+       C 306 272 310 264 310 256 Z"
+    fill="#3355ff"
+    opacity="0.7"
+  />
+  <!-- Period-2 bulb -->
+  <circle cx="155" cy="256" r="38" fill="#5577ff" opacity="0.6"/>
+
+  <!-- Orbit dots (decorative — suggest infinite complexity) -->
+  <circle cx="360" cy="180" r="6"  fill="#ff9900" opacity="0.9"/>
+  <circle cx="385" cy="220" r="4"  fill="#ffcc33" opacity="0.7"/>
+  <circle cx="370" cy="256" r="3"  fill="#ff6633" opacity="0.6"/>
+  <circle cx="355" cy="290" r="5"  fill="#ff4400" opacity="0.8"/>
+  <circle cx="338" cy="318" r="3"  fill="#ff6600" opacity="0.5"/>
+  <circle cx="140" cy="210" r="3"  fill="#88aaff" opacity="0.6"/>
+  <circle cx="130" cy="300" r="4"  fill="#6699ff" opacity="0.5"/>
+
+  <!-- "FL" monogram -->
+  <text
+    x="256" y="440"
+    font-family="'SF Pro Display', 'Helvetica Neue', Helvetica, sans-serif"
+    font-size="52"
+    font-weight="700"
+    text-anchor="middle"
+    fill="rgba(255,255,255,0.75)"
+    letter-spacing="4"
+  >FL</text>
+</svg>

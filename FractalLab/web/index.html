@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>FractalLab</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#000000" />
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FractalLab" />
+  <link rel="apple-touch-icon" href="./icons/icon-512.svg" />
+
+  <!-- Prevent double-tap zoom -->
+  <meta name="format-detection" content="telephone=no" />
+</head>
+<body>
+  <!-- Full-screen WebGPU canvas -->
+  <canvas id="fractal-canvas"></canvas>
+
+  <!-- UI overlays injected by ui.ts -->
+  <div id="ui-overlay"></div>
+
+  <!-- Toast injected by ui.ts -->
+  <div id="toast"></div>
+
+  <!-- Error screen (hidden by default) -->
+  <div id="error-screen" style="display:none">
+    <h1>🔮</h1>
+    <h1>FractalLab</h1>
+    <p></p>
+    <p style="margin-top:8px; font-size:12px; color:rgba(255,255,255,0.4)">
+      WebGPU is available in Safari on iOS 17+ and Chrome/Edge 113+.<br/>
+      Make sure you've opened this page in <strong>Safari</strong> on your iPhone.
+    </p>
+  </div>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

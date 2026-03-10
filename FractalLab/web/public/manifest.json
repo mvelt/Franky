@@ -1,0 +1,18 @@
+{
+  "name": "FractalLab",
+  "short_name": "FractalLab",
+  "description": "GPU-accelerated Mandelbrot & Julia set explorer",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "./icons/icon-512.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
