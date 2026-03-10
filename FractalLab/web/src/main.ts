@@ -115,7 +115,6 @@ async function main() {
     const h   = Math.floor(window.innerHeight * dpr);
     canvas.width  = w;
     canvas.height = h;
-    renderer.resize(w, h);
     state.needsRender = true;
   }
   resizeCanvas();

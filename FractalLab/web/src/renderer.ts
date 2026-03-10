@@ -8,21 +8,15 @@ export class FractalRenderer {
   readonly device: GPUDevice;
   private context: GPUCanvasContext;
   private canvasFormat: GPUTextureFormat;
+  private canvas: HTMLCanvasElement;
 
-  private computePipeline!: GPUComputePipeline;
   private renderPipeline!: GPURenderPipeline;
   private uniformBuffer!: GPUBuffer;
-  private sampler!: GPUSampler;
-
-  // Rebuilt when canvas resizes
-  private fractalTexture!: GPUTexture;
-  private computeBG!: GPUBindGroup;
   private renderBG!: GPUBindGroup;
-  private texW = 0;
-  private texH = 0;
 
   private constructor(device: GPUDevice, canvas: HTMLCanvasElement) {
     this.device = device;
+    this.canvas = canvas;
     const ctx = canvas.getContext('webgpu');
     if (!ctx) throw new Error('webgpu context failed');
     this.context = ctx;
@@ -53,71 +47,28 @@ export class FractalRenderer {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // Sampler for the display pass
-    this.sampler = this.device.createSampler({ magFilter: 'nearest', minFilter: 'nearest' });
-
-    // Compute pipeline
-    const computeBGL = this.device.createBindGroupLayout({
+    // Single bind group layout: uniform buffer visible to fragment stage
+    const bgl = this.device.createBindGroupLayout({
       entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE,
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT,
           buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE,
-          storageTexture: { access: 'write-only', format: 'rgba8unorm', viewDimension: '2d' } },
       ],
     });
-    this.computePipeline = this.device.createComputePipeline({
-      layout: this.device.createPipelineLayout({ bindGroupLayouts: [computeBGL] }),
-      compute: { module, entryPoint: 'fractalKernel' },
-    });
 
-    // Render pipeline
-    const renderBGL = this.device.createBindGroupLayout({
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
-        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {} },
-      ],
-    });
-    this.renderPipeline = this.device.createRenderPipeline({
-      layout: this.device.createPipelineLayout({ bindGroupLayouts: [renderBGL] }),
-      vertex:   { module, entryPoint: 'displayVertex' },
-      fragment: { module, entryPoint: 'displayFragment',
-                  targets: [{ format: this.canvasFormat }] },
-      primitive: { topology: 'triangle-strip' },
-    });
-  }
-
-  // ── Resize ──────────────────────────────────────────────────────────────────
-
-  resize(w: number, h: number) {
-    if (w === this.texW && h === this.texH) return;
-    this.texW = w;
-    this.texH = h;
-    this.fractalTexture?.destroy();
-
-    this.fractalTexture = this.device.createTexture({
-      size: [w, h],
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.STORAGE_BINDING |
-             GPUTextureUsage.TEXTURE_BINDING  |
-             GPUTextureUsage.COPY_SRC,
-    });
-
-    const computeBGL = this.computePipeline.getBindGroupLayout(0);
-    this.computeBG = this.device.createBindGroup({
-      layout: computeBGL,
+    this.renderBG = this.device.createBindGroup({
+      layout: bgl,
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.fractalTexture.createView() },
       ],
     });
 
-    const renderBGL = this.renderPipeline.getBindGroupLayout(0);
-    this.renderBG = this.device.createBindGroup({
-      layout: renderBGL,
-      entries: [
-        { binding: 0, resource: this.sampler },
-        { binding: 1, resource: this.fractalTexture.createView() },
-      ],
+    // Render pipeline: VS generates fullscreen quad, FS computes fractal
+    this.renderPipeline = this.device.createRenderPipeline({
+      layout: this.device.createPipelineLayout({ bindGroupLayouts: [bgl] }),
+      vertex:   { module, entryPoint: 'vs' },
+      fragment: { module, entryPoint: 'fs',
+                  targets: [{ format: this.canvasFormat }] },
+      primitive: { topology: 'triangle-strip' },
     });
   }
 
@@ -147,21 +98,12 @@ export class FractalRenderer {
   // ── Draw ────────────────────────────────────────────────────────────────────
 
   draw() {
-    if (!this.fractalTexture) return;
-    const enc  = this.device.createCommandEncoder();
-
-    // Compute: render fractal → fractalTexture
-    const cp = enc.beginComputePass();
-    cp.setPipeline(this.computePipeline);
-    cp.setBindGroup(0, this.computeBG);
-    cp.dispatchWorkgroups(Math.ceil(this.texW / 16), Math.ceil(this.texH / 16));
-    cp.end();
-
-    // Render: blit fractalTexture → drawable
-    const rp = enc.beginRenderPass({
+    const enc = this.device.createCommandEncoder();
+    const rp  = enc.beginRenderPass({
       colorAttachments: [{
-        view: this.context.getCurrentTexture().createView(),
-        loadOp: 'clear', storeOp: 'store',
+        view:       this.context.getCurrentTexture().createView(),
+        loadOp:     'clear',
+        storeOp:    'store',
         clearValue: { r: 0, g: 0, b: 0, a: 1 },
       }],
     });
@@ -169,43 +111,12 @@ export class FractalRenderer {
     rp.setBindGroup(0, this.renderBG);
     rp.draw(4);
     rp.end();
-
     this.device.queue.submit([enc.finish()]);
   }
 
-  // ── Snapshot (current fractalTexture → PNG blob) ────────────────────────────
+  // ── Snapshot (canvas → PNG blob) ────────────────────────────────────────────
 
   async snapshot(): Promise<Blob | null> {
-    if (!this.fractalTexture) return null;
-    const bytesPerRow = Math.ceil(this.texW * 4 / 256) * 256; // align to 256
-    const readBuf = this.device.createBuffer({
-      size: bytesPerRow * this.texH,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-    });
-
-    const enc = this.device.createCommandEncoder();
-    enc.copyTextureToBuffer(
-      { texture: this.fractalTexture },
-      { buffer: readBuf, bytesPerRow, rowsPerImage: this.texH },
-      [this.texW, this.texH]
-    );
-    this.device.queue.submit([enc.finish()]);
-    await readBuf.mapAsync(GPUMapMode.READ);
-
-    const rawData = new Uint8Array(readBuf.getMappedRange());
-    const offscreen = new OffscreenCanvas(this.texW, this.texH);
-    const ctx = offscreen.getContext('2d')!;
-    const imgData = ctx.createImageData(this.texW, this.texH);
-
-    // Copy row by row (readBuf may have padding per row)
-    for (let y = 0; y < this.texH; y++) {
-      const src = rawData.subarray(y * bytesPerRow, y * bytesPerRow + this.texW * 4);
-      imgData.data.set(src, y * this.texW * 4);
-    }
-    ctx.putImageData(imgData, 0, 0);
-    readBuf.unmap();
-    readBuf.destroy();
-
-    return offscreen.convertToBlob({ type: 'image/png' });
+    return new Promise((resolve) => this.canvas.toBlob(resolve, 'image/png'));
   }
 }
