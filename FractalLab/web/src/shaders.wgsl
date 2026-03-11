@@ -1,11 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // MARK: – Shared uniform struct
 // ─────────────────────────────────────────────────────────────────────────────
-// Layout (14 × f32/i32 = 56 bytes):
+// Layout (16 × f32/i32 = 64 bytes):
 //   [0]  centerX f32  [1] centerY f32  [2] zoom f32  [3] colorOffset f32
 //   [4]  juliaCX f32  [5] juliaCY f32  [6] colorCycle f32  [7] aspectRatio f32
 //   [8]  maxIterations i32  [9] fractalType i32  [10] paletteIndex i32
-//   [11] viewWidth f32  [12] viewHeight f32  [13] _pad i32
+//   [11] viewWidth f32  [12] viewHeight f32  [13-15] _pad i32 ×3
+// 64 bytes = roundUp(16, 56): WGSL uniform structs must be a multiple of 16.
 
 struct FractalUniforms {
   centerX       : f32,
@@ -21,7 +22,9 @@ struct FractalUniforms {
   paletteIndex  : i32,
   viewWidth     : f32,
   viewHeight    : f32,
-  _pad          : i32,
+  _pad0         : i32,
+  _pad1         : i32,
+  _pad2         : i32,
 }
 
 @group(0) @binding(0) var<uniform> u: FractalUniforms;
