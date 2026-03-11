@@ -69,8 +69,13 @@ fn paletteColor(t: f32, idx: i32) -> vec3f {
 // MARK: – Vertex shader (fullscreen triangle-strip)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// VS outputs both clip-space position and NDC UV for the fragment stage.
+// The UV is passed as an explicit inter-stage varying so the fragment shader
+// does not need to rely on @builtin(position), which has known bugs in
+// Safari 17 on iOS (the value can be incorrect on some Metal hardware).
 struct VertexOut {
-  @builtin(position) pos: vec4f,
+  @builtin(position) pos : vec4f,
+  @location(0)       uv  : vec2f,   // NDC coords: x ∈ [-1,1], y ∈ [-1,1] (y-up)
 }
 
 @vertex
@@ -79,24 +84,33 @@ fn vs(@builtin(vertex_index) vid: u32) -> VertexOut {
     vec2f(-1.0, -1.0), vec2f( 1.0, -1.0),
     vec2f(-1.0,  1.0), vec2f( 1.0,  1.0)
   );
+  let p = positions[vid];
   var out: VertexOut;
-  out.pos = vec4f(positions[vid], 0.0, 1.0);
+  out.pos = vec4f(p, 0.0, 1.0);
+  out.uv  = p;
   return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MARK: – Fragment shader (fractal computed per-pixel, no storage texture needed)
+// MARK: – Fragment shader
 // ─────────────────────────────────────────────────────────────────────────────
 
-@fragment
-fn fs(in: VertexOut) -> @location(0) vec4f {
-  // @builtin(position): pixel centre in framebuffer space, origin top-left.
-  let px = in.pos.x;
-  let py = in.pos.y;
+// Separate input struct for the fragment stage: only the location-0 UV varying.
+// Avoids bringing @builtin(position) into FS scope entirely.
+struct FragIn {
+  @location(0) uv: vec2f,
+}
 
+@fragment
+fn fs(in: FragIn) -> @location(0) vec4f {
+  // Map NDC UV to fractal-plane coordinates.
+  // NDC y is +1 at the top of the screen; framebuffer y is 0 at the top.
+  // This matches the original pixel-based formula:
+  //   cx = centerX + (px - viewWidth/2)  * scale   where px = (uv.x+1)/2 * viewWidth
+  //   cy = centerY + (py - viewHeight/2) * scale   where py = (1-uv.y)/2 * viewHeight
   let scale = 1.0 / (u.zoom * min(u.viewWidth, u.viewHeight));
-  let cx    = u.centerX + (px - u.viewWidth  * 0.5) * scale;
-  let cy    = u.centerY + (py - u.viewHeight * 0.5) * scale;
+  let cx    = u.centerX + in.uv.x * 0.5 * u.viewWidth  * scale;
+  let cy    = u.centerY - in.uv.y * 0.5 * u.viewHeight * scale;
 
   var zx: f32;
   var zy: f32;
@@ -121,22 +135,23 @@ fn fs(in: VertexOut) -> @location(0) vec4f {
     jx = u.juliaCX; jy = u.juliaCY;
   }
 
+  // Iteration loop. Use a standard for-loop rather than WGSL's loop{} to
+  // avoid MSL translation issues in Safari's WGSL compiler.
   var iter: i32   = 0;
-  var zx2: f32    = 0.0;
-  var zy2: f32    = 0.0;
+  var zx2:  f32   = 0.0;
+  var zy2:  f32   = 0.0;
   var period: i32 = 0;
-  var pzx: f32    = 0.0;
-  var pzy: f32    = 0.0;
+  var pzx:  f32   = 0.0;
+  var pzy:  f32   = 0.0;
 
-  loop {
-    if (iter >= u.maxIterations) { break; }
+  for (var i: i32 = 0; i < u.maxIterations; i++) {
     zx2 = zx * zx;
     zy2 = zy * zy;
     if (zx2 + zy2 > 4.0) { break; }
     let new_zy = 2.0 * zx * zy + jy;
-    zx = zx2 - zy2 + jx;
-    zy = new_zy;
-    iter += 1;
+    zx   = zx2 - zy2 + jx;
+    zy   = new_zy;
+    iter = i + 1;
     if (zx == pzx && zy == pzy) { iter = u.maxIterations; break; }
     period += 1;
     if (period >= 20) { period = 0; pzx = zx; pzy = zy; }

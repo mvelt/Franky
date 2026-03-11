@@ -65,8 +65,10 @@ export class FractalRenderer {
       ],
     });
 
-    // Render pipeline: VS generates fullscreen quad, FS computes fractal
-    this.renderPipeline = this.device.createRenderPipeline({
+    // Render pipeline: VS generates fullscreen quad, FS computes fractal.
+    // Use the async variant so Safari's Metal shader compiler fully finishes
+    // before the first draw call (the sync variant can silently defer on iOS).
+    this.renderPipeline = await this.device.createRenderPipelineAsync({
       layout: this.device.createPipelineLayout({ bindGroupLayouts: [bgl] }),
       vertex:   { module, entryPoint: 'vs' },
       fragment: { module, entryPoint: 'fs',
